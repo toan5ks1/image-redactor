@@ -1,0 +1,30 @@
+{
+  "name": "privacy-screenshot-redactor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0",
+    "lucide-react": "^1.44.0",
+    "onnxruntime-web": "^1.29.0",
+    "ppu-paddle-ocr": "^6.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0",
+    "vitest": "^5.0.0"
+  }
+}
