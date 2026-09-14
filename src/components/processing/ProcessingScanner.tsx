@@ -41,6 +41,11 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
       stage.phases.some((stagePhase) => stagePhase === phase),
     ),
   );
+  const [stageStart, stageEnd] = STAGE_PROGRESS_RANGES[activeStage];
+  const activeStageProgress = Math.min(
+    100,
+    Math.max(0, ((normalizedProgress - stageStart) / (stageEnd - stageStart)) * 100),
+  );
 
   return (
     <section
@@ -56,19 +61,6 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
         >
           {PROCESSING_STAGES.map((stage, index) => {
             const isActive = index === activeStage;
-            const [stageStart, stageEnd] = STAGE_PROGRESS_RANGES[index];
-            const segmentProgress =
-              index < activeStage
-                ? 1
-                : index > activeStage
-                  ? 0
-                  : Math.min(
-                      1,
-                      Math.max(
-                        0,
-                        (normalizedProgress - stageStart) / (stageEnd - stageStart),
-                      ),
-                    );
 
             return (
               <li
@@ -80,7 +72,6 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
                       ? "active"
                       : ""
                 }
-                style={{ "--stage-progress": segmentProgress } as React.CSSProperties}
                 aria-current={isActive ? "step" : undefined}
               >
                 <span
@@ -88,7 +79,7 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
                   style={
                     isActive
                       ? ({
-                          "--ring-progress": `${normalizedProgress * 3.6}deg`,
+                          "--ring-progress": `${activeStageProgress * 3.6}deg`,
                         } as React.CSSProperties)
                       : undefined
                   }
@@ -96,10 +87,10 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
                   aria-label={isActive ? `${stage.label} progress` : undefined}
                   aria-valuemin={isActive ? 0 : undefined}
                   aria-valuemax={isActive ? 100 : undefined}
-                  aria-valuenow={isActive ? Math.round(normalizedProgress) : undefined}
+                  aria-valuenow={isActive ? Math.round(activeStageProgress) : undefined}
                   aria-valuetext={
                     isActive
-                      ? `${title}: ${Math.round(normalizedProgress)}%`
+                      ? `${title}: ${Math.round(activeStageProgress)}% of this step`
                       : undefined
                   }
                   aria-hidden={isActive ? undefined : true}
@@ -108,7 +99,7 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
                     {index < activeStage
                       ? "✓"
                       : isActive
-                        ? `${Math.round(normalizedProgress)}%`
+                        ? `${Math.round(activeStageProgress)}%`
                         : index + 1}
                   </span>
                 </span>

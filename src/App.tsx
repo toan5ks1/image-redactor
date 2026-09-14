@@ -38,6 +38,16 @@ interface AppNotice {
   message: string;
 }
 
+const PROCESSING_PHASE_RANK: Partial<Record<ProcessingPhase, number>> = {
+  'loading-image': 0,
+  'loading-ocr-model': 1,
+  'running-ocr': 1,
+  'loading-privacy-filter': 2,
+  'detecting-sensitive-data': 2,
+  'preparing-editor': 3,
+  ready: 3,
+};
+
 export const App: React.FC = () => {
   const [currentImage, setCurrentImage] = useState<HTMLImageElement | null>(null);
   const [processingImage, setProcessingImage] = useState<HTMLImageElement | null>(null);
@@ -66,6 +76,7 @@ export const App: React.FC = () => {
   const processingAbortRef = useRef<AbortController | null>(null);
   const currentImageUrlRef = useRef<string | null>(null);
   const pendingImageUrlRef = useRef<string | null>(null);
+  const processingPhaseRankRef = useRef(-1);
 
   const {
     redactions,
@@ -79,6 +90,13 @@ export const App: React.FC = () => {
 
   const releaseObjectUrl = useCallback((url: string | null) => {
     if (url) URL.revokeObjectURL(url);
+  }, []);
+
+  const advanceProcessingPhase = useCallback((phase: ProcessingPhase) => {
+    const nextRank = PROCESSING_PHASE_RANK[phase];
+    if (nextRank === undefined || nextRank < processingPhaseRankRef.current) return;
+    processingPhaseRankRef.current = nextRank;
+    setProcessingPhase(phase);
   }, []);
 
   useEffect(() => {
@@ -98,6 +116,7 @@ export const App: React.FC = () => {
     pendingImageUrlRef.current = null;
     setProcessingImage(null);
     setIsProcessing(false);
+    processingPhaseRankRef.current = -1;
     setProcessingPhase('idle');
     setNotice({ kind: 'warning', message: 'Processing was cancelled. No result was saved.' });
   }, [releaseObjectUrl]);
@@ -115,7 +134,8 @@ export const App: React.FC = () => {
     setIsDebugOpen(false);
     setIsProcessing(true);
     setProcessingImage(null);
-    setProcessingPhase('loading-image');
+    processingPhaseRankRef.current = -1;
+    advanceProcessingPhase('loading-image');
     setProgressState({
       title: 'Loading Image…',
       subtitle: 'Decoding pixels locally in browser memory…',
@@ -137,7 +157,7 @@ export const App: React.FC = () => {
       // Stage 1: Local Neural OCR with PaddleOCR
       const ocrEngine = paddleEngineRef.current;
 
-      setProcessingPhase('loading-ocr-model');
+      advanceProcessingPhase('loading-ocr-model');
       setProgressState({
         title: 'Scanning Image…',
         subtitle: 'Finding and reading text locally…',
@@ -148,7 +168,7 @@ export const App: React.FC = () => {
         file,
         (p) => {
           if (signal.aborted) return;
-          setProcessingPhase(p.progress < 40 ? 'loading-ocr-model' : 'running-ocr');
+          advanceProcessingPhase(p.progress < 40 ? 'loading-ocr-model' : 'running-ocr');
           setProgressState({
             title: 'Scanning Text…',
             subtitle: p.status,
@@ -167,7 +187,7 @@ export const App: React.FC = () => {
       });
 
       // Stage 2: Sensitive Detection (Rules + ONNX Privacy Filter)
-      setProcessingPhase('detecting-sensitive-data');
+      advanceProcessingPhase('detecting-sensitive-data');
       setProgressState({
         title: 'Detecting Sensitive Data…',
         subtitle: 'Applying deterministic security rules & API key patterns…',
@@ -189,7 +209,7 @@ export const App: React.FC = () => {
         imageHeight: imgHeight,
       });
 
-      setProcessingPhase('loading-privacy-filter');
+      advanceProcessingPhase('loading-privacy-filter');
       setProgressState({
         title: 'Analyzing Sensitive Information…',
         subtitle: 'Reviewing recognized text locally…',
@@ -213,7 +233,7 @@ export const App: React.FC = () => {
           ocrResult,
           (p) => {
             if (signal.aborted) return;
-            setProcessingPhase(
+            advanceProcessingPhase(
               p.progress < 95 ? 'detecting-sensitive-data' : 'preparing-editor'
             );
             setProgressState({
@@ -249,7 +269,7 @@ export const App: React.FC = () => {
         modelError: privacyFilterWarning || undefined,
       });
 
-      setProcessingPhase('preparing-editor');
+      advanceProcessingPhase('preparing-editor');
       setProgressState({
         title: 'Preparing Editor…',
         subtitle: 'Mapping findings to image coordinates…',
@@ -274,7 +294,7 @@ export const App: React.FC = () => {
         });
       } else {
         setIsDetectionDegraded(false);
-        setProcessingPhase('ready');
+        advanceProcessingPhase('ready');
         setProgressState({
           title: 'Ready to Edit',
           subtitle: 'Detection complete',
@@ -299,7 +319,7 @@ export const App: React.FC = () => {
         setIsProcessing(false);
       }
     }
-  }, [padding, releaseObjectUrl, resetRedactions]);
+  }, [advanceProcessingPhase, padding, releaseObjectUrl, resetRedactions]);
 
   useEffect(() => {
     if (!currentImage) return;
@@ -444,6 +464,7 @@ export const App: React.FC = () => {
     setIsDetectionDegraded(false);
     setDebugData(null);
     setIsDebugOpen(false);
+    processingPhaseRankRef.current = -1;
     setProcessingPhase('idle');
     setIsComparing(false);
     setIsExportOpen(false);

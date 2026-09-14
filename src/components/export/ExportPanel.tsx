@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Copy, Download, ShieldCheck, X } from "lucide-react";
 import { Redaction } from "../../domain/redaction";
-import { ImageExporter } from "../../features/export/ImageExporter";
+import {
+  IMAGE_EXPORT_FORMATS,
+  ImageExporter,
+  ImageExportFormatId,
+} from "../../features/export/ImageExporter";
 
 interface ExportPanelProps {
   image: HTMLImageElement;
@@ -22,6 +26,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   const [copied, setCopied] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [riskAccepted, setRiskAccepted] = useState(false);
+  const [formatId, setFormatId] = useState<ImageExportFormatId>("png");
 
   const imageWidth = image.naturalWidth || image.width;
   const imageHeight = image.naturalHeight || image.height;
@@ -30,6 +35,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     0,
   );
   const excludedCount = redactions.length - protectedCount;
+  const exportFormat = IMAGE_EXPORT_FORMATS[formatId];
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -86,7 +92,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     setExportError(null);
     setIsExporting(true);
 
-    void ImageExporter.exportRedactedImage(image, redactions)
+    void ImageExporter.exportRedactedImage(image, redactions, {}, exportFormat)
       .then((result) => {
         if (!cancelled) setBlob(result);
       })
@@ -103,7 +109,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [image, redactions]);
+  }, [exportFormat, image, redactions]);
 
   const exportDisabled =
     isExporting || !blob || (isDetectionDegraded && !riskAccepted);
@@ -111,14 +117,17 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   const handleDownload = () => {
     if (!blob) return;
     const date = new Date().toISOString().slice(0, 10);
-    ImageExporter.downloadBlob(blob, `redacted-screenshot-${date}.png`);
+    ImageExporter.downloadBlob(
+      blob,
+      ImageExporter.createFilename("redacted-screenshot", date, exportFormat),
+    );
   };
 
   const handleCopy = async () => {
     if (!blob) return;
-    const success = await ImageExporter.copyToClipboard(blob);
+    const success = await ImageExporter.copyToClipboard(blob, exportFormat);
     if (!success) {
-      setExportError("Clipboard access failed. Download the PNG instead.");
+      setExportError(`Clipboard access failed. Download the ${exportFormat.label} instead.`);
       return;
     }
 
@@ -169,7 +178,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               <span>
                 {excludedCount > 0
                   ? "Return to the findings list if this was not intentional."
-                  : "The exported PNG includes every enabled redaction."}
+                  : `The exported ${exportFormat.label} includes every enabled redaction.`}
               </span>
             </div>
           </div>
@@ -186,10 +195,20 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           ) : null}
 
           <div className="export-file-meta">
-            <div>
+            <label className="export-format-control">
               <span>Format</span>
-              <strong>PNG</strong>
-            </div>
+              <select
+                value={formatId}
+                onChange={(event) => setFormatId(event.target.value as ImageExportFormatId)}
+                aria-label="Export format"
+              >
+                {Object.entries(IMAGE_EXPORT_FORMATS).map(([id, format]) => (
+                  <option key={id} value={id}>
+                    {format.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div>
               <span>Dimensions</span>
               <strong>
@@ -227,7 +246,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             disabled={exportDisabled}
           >
             <Download size={16} aria-hidden="true" />
-            {isExporting ? "Preparing PNG…" : "Download PNG"}
+            {isExporting
+              ? `Preparing ${exportFormat.label}…`
+              : `Download ${exportFormat.label}`}
           </button>
         </footer>
       </section>
