@@ -3,7 +3,7 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  ArrowRight,
+  Download,
   Sliders,
   ListChecks,
   PanelRightClose,
@@ -37,7 +37,7 @@ interface EntitySidebarProps {
   onBatchSetStyle: (style: RedactionStyle) => void;
   padding: number;
   onPaddingChange: (padding: number) => void;
-  onReview: () => void;
+  onExport: () => void;
 }
 
 export const EntitySidebar: React.FC<EntitySidebarProps> = ({
@@ -51,7 +51,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
   onBatchSetStyle,
   padding,
   onPaddingChange,
-  onReview,
+  onExport,
 }) => {
   const [filterCategory, setFilterCategory] = useState<EntityCategory | "all">("all");
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -361,11 +361,11 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
         <button
           type="button"
           className="primary-btn"
-          onClick={onReview}
+          onClick={onExport}
           disabled={enabledCount === 0}
         >
-          <span>Review & Export</span>
-          <ArrowRight size={16} aria-hidden="true" />
+          <span>Export Image</span>
+          <Download size={16} aria-hidden="true" />
         </button>
       </div>
     </aside>

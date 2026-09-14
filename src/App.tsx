@@ -6,9 +6,9 @@ import {
   DetectionDebugData,
   DetectionDebugModal,
 } from './components/processing/DetectionDebugModal';
-import { EditorCanvas, ReviewView } from './components/editor/EditorCanvas';
+import { EditorCanvas } from './components/editor/EditorCanvas';
 import { EntitySidebar } from './components/editor/EntitySidebar';
-import { ReviewExportBar, ReviewToolbar } from './components/review/ReviewControls';
+import { ExportPanel } from './components/export/ExportPanel';
 
 import { Redaction, RedactionStyle } from './domain/redaction';
 import { BBox, OCRResult } from './domain/ocr';
@@ -29,7 +29,7 @@ type ProcessingPhase =
   | 'running-ocr'
   | 'loading-privacy-filter'
   | 'detecting-sensitive-data'
-  | 'rendering-preview'
+  | 'preparing-editor'
   | 'ready'
   | 'failed';
 
@@ -55,8 +55,8 @@ export const App: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [padding, setPadding] = useState<number>(4);
-  const [workspaceMode, setWorkspaceMode] = useState<'edit' | 'review'>('edit');
-  const [reviewView, setReviewView] = useState<ReviewView>('compare');
+  const [isComparing, setIsComparing] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [comparePosition, setComparePosition] = useState(50);
 
   // Engine singletons
@@ -214,7 +214,7 @@ export const App: React.FC = () => {
           (p) => {
             if (signal.aborted) return;
             setProcessingPhase(
-              p.progress < 95 ? 'detecting-sensitive-data' : 'rendering-preview'
+              p.progress < 95 ? 'detecting-sensitive-data' : 'preparing-editor'
             );
             setProgressState({
               title: 'Analyzing Sensitive Information…',
@@ -249,10 +249,10 @@ export const App: React.FC = () => {
         modelError: privacyFilterWarning || undefined,
       });
 
-      setProcessingPhase('rendering-preview');
+      setProcessingPhase('preparing-editor');
       setProgressState({
-        title: 'Rendering Preview…',
-        subtitle: 'Mapping detections to original image coordinates…',
+        title: 'Preparing Editor…',
+        subtitle: 'Mapping findings to image coordinates…',
         progress: 98,
       });
       signal.throwIfAborted();
@@ -276,7 +276,7 @@ export const App: React.FC = () => {
         setIsDetectionDegraded(false);
         setProcessingPhase('ready');
         setProgressState({
-          title: 'Ready for Review',
+          title: 'Ready to Edit',
           subtitle: 'Detection complete',
           progress: 100,
         });
@@ -307,7 +307,6 @@ export const App: React.FC = () => {
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, textarea, select')) return;
       if (
-        workspaceMode !== 'edit' ||
         !(event.metaKey || event.ctrlKey) ||
         event.key.toLowerCase() !== 'z'
       ) return;
@@ -317,16 +316,16 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleHistoryShortcut);
     return () => window.removeEventListener('keydown', handleHistoryShortcut);
-  }, [currentImage, redo, undo, workspaceMode]);
+  }, [currentImage, redo, undo]);
 
   useEffect(() => {
-    if (workspaceMode !== 'review') return;
+    if (!isComparing || isExportOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setWorkspaceMode('edit');
+      if (event.key === 'Escape') setIsComparing(false);
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [workspaceMode]);
+  }, [isComparing, isExportOpen]);
 
   // Toggle individual redaction
   const handleToggleRedaction = useCallback(
@@ -446,26 +445,22 @@ export const App: React.FC = () => {
     setDebugData(null);
     setIsDebugOpen(false);
     setProcessingPhase('idle');
-    setWorkspaceMode('edit');
-    setReviewView('compare');
+    setIsComparing(false);
+    setIsExportOpen(false);
     setComparePosition(50);
   };
 
-  const handleEnterReview = useCallback(() => {
-    setSelectedId(null);
-    setReviewView('compare');
-    setComparePosition(50);
-    setWorkspaceMode('review');
+  const handleCompareModeChange = useCallback((comparing: boolean) => {
+    if (comparing) setSelectedId(null);
+    setIsComparing(comparing);
   }, []);
+
+  const handleOpenExport = useCallback(() => setIsExportOpen(true), []);
+  const handleCloseExport = useCallback(() => setIsExportOpen(false), []);
 
   const handleOpenDebug = useCallback(() => {
     setIsDebugOpen(true);
   }, []);
-
-  const protectedRedactionCount = redactions.reduce(
-    (count, redaction) => count + (redaction.enabled ? 1 : 0),
-    0
-  );
 
   return (
     <div className="app-container">
@@ -474,7 +469,7 @@ export const App: React.FC = () => {
       </a>
       <Header
         hasImage={!!currentImage}
-        isEditing={workspaceMode === 'edit'}
+        isEditing={true}
         onReset={handleReset}
         onUndo={undo}
         onRedo={redo}
@@ -504,18 +499,8 @@ export const App: React.FC = () => {
         ) : !currentImage ? (
           <DropZone onFileSelect={handleProcessImage} isLoading={isProcessing} />
         ) : (
-          <div className={`editor-layout ${workspaceMode === 'review' ? 'review-mode' : ''}`}>
+          <div className={`editor-layout ${isComparing ? 'compare-mode' : ''}`}>
             <div className="editor-workspace">
-              {workspaceMode === 'review' && (
-                <ReviewToolbar
-                  view={reviewView}
-                  findingCount={redactions.length}
-                  protectedCount={protectedRedactionCount}
-                  onViewChange={setReviewView}
-                  onBack={() => setWorkspaceMode('edit')}
-                />
-              )}
-
               <EditorCanvas
                 image={currentImage}
                 redactions={redactions}
@@ -525,39 +510,38 @@ export const App: React.FC = () => {
                 onUpdateRedactionBbox={handleUpdateRedactionBbox}
                 onOpenDebug={handleOpenDebug}
                 hasDebugData={debugData !== null}
-                reviewMode={workspaceMode === 'review'}
-                reviewView={reviewView}
+                compareMode={isComparing}
                 comparePosition={comparePosition}
+                onCompareModeChange={handleCompareModeChange}
                 onComparePositionChange={setComparePosition}
               />
-
-              {workspaceMode === 'review' && (
-                <ReviewExportBar
-                  image={currentImage}
-                  redactions={redactions}
-                  isDetectionDegraded={isDetectionDegraded}
-                />
-              )}
             </div>
 
-            {workspaceMode === 'edit' && (
-              <EntitySidebar
-                redactions={redactions}
-                selectedId={selectedId}
-                onSelectRedaction={setSelectedId}
-                onToggleRedaction={handleToggleRedaction}
-                onChangeStyle={handleChangeStyle}
-                onDeleteRedaction={handleDeleteRedaction}
-                onBatchToggleAll={handleBatchToggleAll}
-                onBatchSetStyle={handleBatchSetStyle}
-                padding={padding}
-                onPaddingChange={handlePaddingChange}
-                onReview={handleEnterReview}
-              />
-            )}
+            <EntitySidebar
+              redactions={redactions}
+              selectedId={selectedId}
+              onSelectRedaction={setSelectedId}
+              onToggleRedaction={handleToggleRedaction}
+              onChangeStyle={handleChangeStyle}
+              onDeleteRedaction={handleDeleteRedaction}
+              onBatchToggleAll={handleBatchToggleAll}
+              onBatchSetStyle={handleBatchSetStyle}
+              padding={padding}
+              onPaddingChange={handlePaddingChange}
+              onExport={handleOpenExport}
+            />
           </div>
         )}
       </main>
+
+      {isExportOpen && currentImage && (
+        <ExportPanel
+          image={currentImage}
+          redactions={redactions}
+          isDetectionDegraded={isDetectionDegraded}
+          onClose={handleCloseExport}
+        />
+      )}
 
       {isDebugOpen && debugData && (
         <DetectionDebugModal data={debugData} onClose={() => setIsDebugOpen(false)} />

@@ -17,7 +17,7 @@ const PROCESSING_STAGES = [
     label: "Find Sensitive Data",
     phases: ["loading-privacy-filter", "detecting-sensitive-data"],
   },
-  { label: "Build Preview", phases: ["rendering-preview", "ready"] },
+  { label: "Prepare Editor", phases: ["preparing-editor", "ready"] },
 ] as const;
 
 export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({

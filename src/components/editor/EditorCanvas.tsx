@@ -7,12 +7,11 @@ import {
   Hand,
   MousePointer,
   FileSearch2,
+  Columns2,
 } from "lucide-react";
 import { Redaction } from "../../domain/redaction";
 import { RedactionRenderer } from "../../features/canvas/RedactionRenderer";
 import { BBox } from "../../domain/ocr";
-
-export type ReviewView = "redacted" | "original" | "compare";
 
 interface EditorCanvasProps {
   image: HTMLImageElement;
@@ -23,9 +22,9 @@ interface EditorCanvasProps {
   onUpdateRedactionBbox: (id: string, bbox: BBox) => void;
   onOpenDebug: () => void;
   hasDebugData: boolean;
-  reviewMode?: boolean;
-  reviewView?: ReviewView;
+  compareMode?: boolean;
   comparePosition?: number;
+  onCompareModeChange: (comparing: boolean) => void;
   onComparePositionChange?: (position: number) => void;
   pixelateBlockSize?: number;
   blurRadius?: number;
@@ -41,9 +40,9 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   onUpdateRedactionBbox,
   onOpenDebug,
   hasDebugData,
-  reviewMode = false,
-  reviewView = "redacted",
+  compareMode = false,
   comparePosition = 50,
+  onCompareModeChange,
   onComparePositionChange,
   pixelateBlockSize,
   blurRadius,
@@ -142,9 +141,9 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       if (e.code === "Space") {
         e.preventDefault();
         setIsSpacePressed(true);
-      } else if (!reviewMode && (e.key === "v" || e.key === "V")) {
+      } else if (!compareMode && (e.key === "v" || e.key === "V")) {
         setTool("select");
-      } else if (!reviewMode && (e.key === "r" || e.key === "R")) {
+      } else if (!compareMode && (e.key === "r" || e.key === "R")) {
         setTool("draw");
       } else if (e.key === "h" || e.key === "H") {
         setTool("pan");
@@ -163,7 +162,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [handleFitToScreen, reviewMode]);
+  }, [compareMode, handleFitToScreen]);
 
   // Render canvas whenever dependencies change
   const renderCanvas = useCallback(() => {
@@ -181,50 +180,45 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
           )
         : redactions;
 
-    if (reviewMode && reviewView === "original") {
-      ctx.clearRect(0, 0, imgWidth, imgHeight);
+    RedactionRenderer.drawRedactedImage(ctx, image, renderedRedactions, {
+      interactiveOverlay: !compareMode,
+      selectedId,
+      hoveredId,
+      pixelateBlockSize,
+      blurRadius,
+      maskColor,
+    });
+
+    if (compareMode) {
+      const dividerX = Math.round((imgWidth * comparePosition) / 100);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, dividerX, imgHeight);
+      ctx.clip();
       ctx.drawImage(image, 0, 0, imgWidth, imgHeight);
-    } else {
-      RedactionRenderer.drawRedactedImage(ctx, image, renderedRedactions, {
-        interactiveOverlay: !reviewMode,
-        selectedId,
-        hoveredId,
-        pixelateBlockSize,
-        blurRadius,
-        maskColor,
-      });
+      ctx.restore();
 
-      if (reviewMode && reviewView === "compare") {
-        const dividerX = Math.round((imgWidth * comparePosition) / 100);
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, dividerX, imgHeight);
-        ctx.clip();
-        ctx.drawImage(image, 0, 0, imgWidth, imgHeight);
-        ctx.restore();
-
-        ctx.save();
-        ctx.fillStyle = "#38bdf8";
-        const markerRadius = 14 / scale;
-        const dividerWidth = Math.max(1, 2 / scale);
-        ctx.fillRect(dividerX - dividerWidth / 2, 0, dividerWidth, imgHeight);
-        ctx.beginPath();
-        ctx.arc(dividerX, imgHeight / 2, markerRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#082f49";
-        ctx.lineWidth = Math.max(1, 1.5 / scale);
-        ctx.stroke();
-        ctx.fillStyle = "#082f49";
-        ctx.font = `700 ${14 / scale}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("↔", dividerX, imgHeight / 2);
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.fillStyle = "#5ab8ff";
+      const markerRadius = 14 / scale;
+      const dividerWidth = Math.max(1, 2 / scale);
+      ctx.fillRect(dividerX - dividerWidth / 2, 0, dividerWidth, imgHeight);
+      ctx.beginPath();
+      ctx.arc(dividerX, imgHeight / 2, markerRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#071017";
+      ctx.lineWidth = Math.max(1, 1.5 / scale);
+      ctx.stroke();
+      ctx.fillStyle = "#071017";
+      ctx.font = `700 ${14 / scale}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("↔", dividerX, imgHeight / 2);
+      ctx.restore();
     }
 
     // Draw active drawing box preview
-    if (!reviewMode && currentDrawBox) {
+    if (!compareMode && currentDrawBox) {
       const [x0, y0, x1, y1] = currentDrawBox;
       ctx.save();
       ctx.fillStyle = "rgba(56, 189, 248, 0.2)";
@@ -246,8 +240,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     pixelateBlockSize,
     blurRadius,
     maskColor,
-    reviewMode,
-    reviewView,
+    compareMode,
     comparePosition,
     scale,
     imgWidth,
@@ -316,11 +309,14 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
   // Mouse Down
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest("button, input, select, a")) return;
+    if (
+      (e.target as HTMLElement).closest(
+        ".canvas-floating-toolbar, button, input, select, a",
+      )
+    ) return;
 
     if (
-      reviewMode &&
-      reviewView === "compare" &&
+      compareMode &&
       e.button === 0 &&
       !isSpacePressed &&
       updateComparePosition(e.clientX)
@@ -333,7 +329,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
     if (
       e.button === 1 ||
-      (reviewMode && e.button === 0) ||
+      (compareMode && e.button === 0) ||
       tool === "pan" ||
       (e.button === 0 && isSpacePressed)
     ) {
@@ -417,7 +413,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       return;
     }
 
-    if (reviewMode) return;
+    if (compareMode) return;
 
     const coords = clientToImageCoords(e.clientX, e.clientY);
 
@@ -494,7 +490,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       return;
     }
 
-    if (reviewMode) return;
+    if (compareMode) return;
 
     if (boxEdit && currentEditBox) {
       onUpdateRedactionBbox(boxEdit.id, currentEditBox);
@@ -524,7 +520,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   };
 
   const handleViewportKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (reviewMode || !selectedId || !event.key.startsWith("Arrow")) return;
+    if (compareMode || !selectedId || !event.key.startsWith("Arrow")) return;
     const selected = redactions.find((redaction) => redaction.id === selectedId);
     if (!selected) return;
 
@@ -546,8 +542,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       ref={viewportRef}
       role="region"
       aria-label={
-        reviewMode
-          ? `Screenshot review, ${reviewView} view. Drag to pan and use the toolbar to zoom.`
+        compareMode
+          ? "Screenshot comparison. Drag the divider to compare the original and redacted image."
           : "Screenshot redaction editor. Select a region, then use the arrow keys to move it."
       }
       tabIndex={0}
@@ -559,8 +555,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     >
       <div
         className={`canvas-container ${
-          reviewMode
-            ? reviewView === "compare" && !isSpacePressed
+          compareMode
+            ? !isSpacePressed
               ? "comparing"
               : isPanning
                 ? "is-panning"
@@ -587,9 +583,9 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
         />
       </div>
 
-      {reviewMode && (
+      {compareMode && (
         <div
-          className="review-canvas-labels"
+          className="compare-canvas-labels"
           aria-hidden="true"
           style={{
             left: `${pan.x + 12}px`,
@@ -597,30 +593,58 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             width: `${Math.max(0, imgWidth * scale - 24)}px`,
           }}
         >
-          <span>{reviewView === "compare" ? "Original" : reviewView}</span>
-          {reviewView === "compare" && <span>Redacted</span>}
+          <span>Original</span>
+          <span>Redacted</span>
         </div>
       )}
 
       {/* Floating Toolbar */}
-      <div className="canvas-floating-toolbar">
-        {reviewMode ? (
-          <span
-            className="review-pan-hint"
-            role="note"
-            aria-label={
-              reviewView === "compare"
-                ? "Drag the divider to compare. Hold Space and drag to pan."
-                : "Drag the image to pan."
-            }
-            title={
-              reviewView === "compare"
-                ? "Drag the divider to compare. Hold Space and drag to pan."
-                : "Drag the image to pan."
-            }
+      <div className="canvas-floating-toolbar" role="group" aria-label="Canvas controls">
+        <div className="canvas-mode-switcher" role="group" aria-label="Canvas mode">
+          <button
+            type="button"
+            className={!compareMode ? "active" : ""}
+            onClick={() => onCompareModeChange(false)}
+            aria-pressed={!compareMode}
           >
-            <Hand size={14} aria-hidden="true" />
-          </span>
+            Edit
+          </button>
+          <button
+            type="button"
+            className={compareMode ? "active" : ""}
+            onClick={() => onCompareModeChange(true)}
+            aria-pressed={compareMode}
+          >
+            <Columns2 size={14} aria-hidden="true" />
+            Compare
+          </button>
+        </div>
+
+        <div className="toolbar-divider" aria-hidden="true" />
+
+        {compareMode ? (
+          <>
+            <span
+              className="compare-pan-hint"
+              role="note"
+              aria-label="Drag the divider to compare. Hold Space and drag to pan."
+              title="Drag the divider to compare. Hold Space and drag to pan."
+            >
+              <Hand size={14} aria-hidden="true" />
+            </span>
+            <label className="compare-slider-control">
+              <span>Split</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={comparePosition}
+                name="comparison-position"
+                aria-label="Original and redacted comparison position"
+                onChange={(event) => onComparePositionChange?.(Number(event.target.value))}
+              />
+            </label>
+          </>
         ) : (
           <>
             <button
@@ -654,21 +678,6 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
               <Hand size={16} aria-hidden="true" />
             </button>
           </>
-        )}
-
-        {reviewMode && reviewView === "compare" && (
-          <label className="compare-slider-control">
-            <span>Compare</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={comparePosition}
-              name="comparison-position"
-              aria-label="Original and redacted comparison position"
-              onChange={(event) => onComparePositionChange?.(Number(event.target.value))}
-            />
-          </label>
         )}
 
         <div className="toolbar-divider" aria-hidden="true" />
@@ -705,7 +714,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
           <Maximize2 size={16} aria-hidden="true" />
         </button>
 
-        {!reviewMode && (
+        {!compareMode && (
           <>
             <div className="toolbar-divider" aria-hidden="true" />
             <button
