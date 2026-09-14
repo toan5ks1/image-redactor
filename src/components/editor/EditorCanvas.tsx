@@ -6,6 +6,7 @@ import {
   Square,
   Hand,
   MousePointer,
+  Pencil,
   FileSearch2,
   Columns2,
 } from "lucide-react";
@@ -199,7 +200,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       ctx.restore();
 
       ctx.save();
-      ctx.fillStyle = "#5ab8ff";
+      ctx.fillStyle = "#12d99a";
       const markerRadius = 14 / scale;
       const dividerWidth = Math.max(1, 2 / scale);
       ctx.fillRect(dividerX - dividerWidth / 2, 0, dividerWidth, imgHeight);
@@ -280,6 +281,15 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     return true;
   };
 
+  const isNearCompareDivider = (clientX: number, hitArea: number): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const rect = canvas.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right) return false;
+    const dividerX = rect.left + (rect.width * comparePosition) / 100;
+    return Math.abs(clientX - dividerX) <= hitArea;
+  };
+
   // Active wheel event listener for zoom to allow e.preventDefault()
   useEffect(() => {
     const el = viewportRef.current;
@@ -319,10 +329,11 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       compareMode &&
       e.button === 0 &&
       !isSpacePressed &&
-      updateComparePosition(e.clientX)
+      isNearCompareDivider(e.clientX, e.pointerType === "touch" ? 28 : 18)
     ) {
       e.preventDefault();
       e.currentTarget.setPointerCapture(e.pointerId);
+      updateComparePosition(e.clientX);
       setIsAdjustingCompare(true);
       return;
     }
@@ -543,7 +554,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       role="region"
       aria-label={
         compareMode
-          ? "Screenshot comparison. Drag the divider to compare the original and redacted image."
+          ? "Screenshot comparison. Drag the divider to compare. Drag elsewhere to pan the image."
           : "Screenshot redaction editor. Select a region, then use the arrow keys to move it."
       }
       tabIndex={0}
@@ -556,7 +567,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       <div
         className={`canvas-container ${
           compareMode
-            ? !isSpacePressed
+            ? isAdjustingCompare
               ? "comparing"
               : isPanning
                 ? "is-panning"
@@ -607,7 +618,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             onClick={() => onCompareModeChange(false)}
             aria-pressed={!compareMode}
           >
-            Edit
+            <Pencil size={14} aria-hidden="true" />
+            <span className="canvas-mode-label">Edit</span>
           </button>
           <button
             type="button"
@@ -616,7 +628,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             aria-pressed={compareMode}
           >
             <Columns2 size={14} aria-hidden="true" />
-            Compare
+            <span className="canvas-mode-label">Compare</span>
           </button>
         </div>
 
@@ -627,8 +639,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             <span
               className="compare-pan-hint"
               role="note"
-              aria-label="Drag the divider to compare. Hold Space and drag to pan."
-              title="Drag the divider to compare. Hold Space and drag to pan."
+              aria-label="Drag the divider to compare. Drag elsewhere to pan."
+              title="Drag the divider to compare. Drag elsewhere to pan."
             >
               <Hand size={14} aria-hidden="true" />
             </span>

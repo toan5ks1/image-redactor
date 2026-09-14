@@ -1,5 +1,5 @@
 import React from "react";
-import { Shield, Lock, Undo2, Redo2, ImagePlus } from "lucide-react";
+import { Shield, Lock, Undo2, Redo2, ImagePlus, X } from "lucide-react";
 
 interface HeaderProps {
   hasImage: boolean;
@@ -9,6 +9,8 @@ interface HeaderProps {
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  isProcessing: boolean;
+  onCancelProcessing: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   onRedo,
   canUndo,
   canRedo,
+  isProcessing,
+  onCancelProcessing,
 }) => {
   return (
     <header className="app-header">
@@ -42,6 +46,18 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="header-actions">
+        {isProcessing ? (
+          <button
+            type="button"
+            className="header-cancel-btn"
+            onClick={onCancelProcessing}
+            aria-label="Cancel image processing"
+          >
+            <X size={15} aria-hidden="true" />
+            <span className="header-cancel-label">Cancel Processing</span>
+          </button>
+        ) : null}
+
         {hasImage && isEditing && (
           <div
             className="header-history-actions"
@@ -83,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="Start over with a new image"
             >
               <ImagePlus size={15} aria-hidden="true" />
-              New Image
+              <span className="new-image-label">New Image</span>
             </button>
           </>
         )}

@@ -58,7 +58,10 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const activeElement = document.activeElement;
-      if (event.shiftKey && (activeElement === first || activeElement === dialog)) {
+      if (
+        event.shiftKey &&
+        (activeElement === first || activeElement === dialog)
+      ) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -89,7 +92,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       })
       .catch((error) => {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : "Unknown export error.";
+        const message =
+          error instanceof Error ? error.message : "Unknown export error.";
         setExportError(`Export failed: ${message}`);
       })
       .finally(() => {
@@ -152,7 +156,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         </header>
 
         <div className="export-panel-body">
-          <div className={`export-safety ${excludedCount > 0 ? "needs-review" : ""}`}>
+          <div
+            className={`export-safety ${excludedCount > 0 ? "needs-review" : ""}`}
+          >
             <ShieldCheck size={20} aria-hidden="true" />
             <div>
               <strong>
@@ -186,11 +192,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             </div>
             <div>
               <span>Dimensions</span>
-              <strong>{imageWidth} × {imageHeight}&nbsp;px</strong>
-            </div>
-            <div>
-              <span>Upload</span>
-              <strong>0 bytes</strong>
+              <strong>
+                {imageWidth} × {imageHeight}&nbsp;px
+              </strong>
             </div>
           </div>
 
@@ -209,7 +213,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             disabled={exportDisabled}
             aria-live="polite"
           >
-            {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
+            {copied ? (
+              <Check size={15} aria-hidden="true" />
+            ) : (
+              <Copy size={15} aria-hidden="true" />
+            )}
             {copied ? "Copied" : "Copy Image"}
           </button>
           <button

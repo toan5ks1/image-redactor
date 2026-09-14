@@ -475,6 +475,8 @@ export const App: React.FC = () => {
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
+        isProcessing={isProcessing}
+        onCancelProcessing={handleCancelProcessing}
       />
 
       {notice && (
@@ -494,7 +496,6 @@ export const App: React.FC = () => {
             subtitle={progressState.subtitle}
             progress={progressState.progress}
             phase={processingPhase}
-            onCancel={handleCancelProcessing}
           />
         ) : !currentImage ? (
           <DropZone onFileSelect={handleProcessImage} isLoading={isProcessing} />

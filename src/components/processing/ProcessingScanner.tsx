@@ -1,5 +1,4 @@
 import React from "react";
-import { X } from "lucide-react";
 
 interface ProcessingScannerProps {
   image: HTMLImageElement;
@@ -7,7 +6,6 @@ interface ProcessingScannerProps {
   subtitle: string;
   progress: number;
   phase: string;
-  onCancel: () => void;
 }
 
 const PROCESSING_STAGES = [
@@ -20,13 +18,19 @@ const PROCESSING_STAGES = [
   { label: "Prepare Editor", phases: ["preparing-editor", "ready"] },
 ] as const;
 
+const STAGE_PROGRESS_RANGES = [
+  [0, 15],
+  [15, 60],
+  [60, 98],
+  [98, 100],
+] as const;
+
 export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
   image,
   title,
   subtitle,
   progress,
   phase,
-  onCancel,
 }) => {
   const width = image.naturalWidth || image.width;
   const height = image.naturalHeight || image.height;
@@ -41,31 +45,87 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
   return (
     <section
       className="processing-scanner"
-      aria-labelledby="processing-title"
+      aria-label="Processing screenshot"
       aria-describedby="processing-status"
       aria-busy="true"
     >
-      <ol
-        className="processing-stage-strip"
-        aria-label="Image processing stages"
-      >
-        {PROCESSING_STAGES.map((stage, index) => (
-          <li
-            key={stage.label}
-            className={
+      <div className="processing-progress-shell">
+        <ol
+          className="processing-stage-strip"
+          aria-label="Image processing stages"
+        >
+          {PROCESSING_STAGES.map((stage, index) => {
+            const isActive = index === activeStage;
+            const [stageStart, stageEnd] = STAGE_PROGRESS_RANGES[index];
+            const segmentProgress =
               index < activeStage
-                ? "complete"
-                : index === activeStage
-                  ? "active"
-                  : ""
-            }
-            aria-current={index === activeStage ? "step" : undefined}
-          >
-            <span>{index < activeStage ? "✓" : index + 1}</span>
-            {stage.label}
-          </li>
-        ))}
-      </ol>
+                ? 1
+                : index > activeStage
+                  ? 0
+                  : Math.min(
+                      1,
+                      Math.max(
+                        0,
+                        (normalizedProgress - stageStart) / (stageEnd - stageStart),
+                      ),
+                    );
+
+            return (
+              <li
+                key={stage.label}
+                className={
+                  index < activeStage
+                    ? "complete"
+                    : isActive
+                      ? "active"
+                      : ""
+                }
+                style={{ "--stage-progress": segmentProgress } as React.CSSProperties}
+                aria-current={isActive ? "step" : undefined}
+              >
+                <span
+                  className={`processing-stage-marker${isActive ? " has-progress" : ""}`}
+                  style={
+                    isActive
+                      ? ({
+                          "--ring-progress": `${normalizedProgress * 3.6}deg`,
+                        } as React.CSSProperties)
+                      : undefined
+                  }
+                  role={isActive ? "progressbar" : undefined}
+                  aria-label={isActive ? `${stage.label} progress` : undefined}
+                  aria-valuemin={isActive ? 0 : undefined}
+                  aria-valuemax={isActive ? 100 : undefined}
+                  aria-valuenow={isActive ? Math.round(normalizedProgress) : undefined}
+                  aria-valuetext={
+                    isActive
+                      ? `${title}: ${Math.round(normalizedProgress)}%`
+                      : undefined
+                  }
+                  aria-hidden={isActive ? undefined : true}
+                >
+                  <span className="processing-stage-marker-value">
+                    {index < activeStage
+                      ? "✓"
+                      : isActive
+                        ? `${Math.round(normalizedProgress)}%`
+                        : index + 1}
+                  </span>
+                </span>
+                <span className="processing-stage-copy">
+                  <span className="processing-stage-label">{stage.label}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+
+      </div>
+
+      <p id="processing-status" className="sr-only" role="status" aria-live="polite">
+        {title}. {subtitle} {Math.round(normalizedProgress)}% complete.
+      </p>
+
       <div className="processing-scan-stage">
         <img
           className="processing-scan-image"
@@ -81,37 +141,6 @@ export const ProcessingScanner: React.FC<ProcessingScannerProps> = ({
         <div className="processing-scan-grid" aria-hidden="true" />
       </div>
 
-      <div className="processing-scan-status" role="status" aria-live="polite">
-        <div className="processing-scan-copy">
-          <strong id="processing-title">{title}</strong>
-          <span id="processing-status">{subtitle}</span>
-        </div>
-
-        <div
-          className="processing-scan-progress"
-          role="progressbar"
-          aria-label="Image processing progress"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(normalizedProgress)}
-          aria-valuetext={`${phase}: ${Math.round(normalizedProgress)}%`}
-        >
-          <span style={{ transform: `scaleX(${normalizedProgress / 100})` }} />
-        </div>
-
-        <span className="processing-scan-percent">
-          {Math.round(normalizedProgress)}%
-        </span>
-        <button
-          type="button"
-          className="toolbar-btn processing-cancel-btn"
-          onClick={onCancel}
-          aria-label="Cancel image processing"
-          title="Cancel processing"
-        >
-          <X size={17} aria-hidden="true" />
-        </button>
-      </div>
     </section>
   );
 };
