@@ -109,6 +109,36 @@ export const App: React.FC = () => {
     };
   }, [releaseObjectUrl]);
 
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    let frameId: number | undefined;
+    const updateViewportHeight = () => {
+      frameId = undefined;
+      document.documentElement.style.setProperty(
+        '--app-viewport-height',
+        `${viewport.height}px`
+      );
+    };
+    const scheduleViewportHeightUpdate = () => {
+      if (frameId === undefined) {
+        frameId = window.requestAnimationFrame(updateViewportHeight);
+      }
+    };
+
+    scheduleViewportHeightUpdate();
+    viewport.addEventListener('resize', scheduleViewportHeightUpdate);
+    window.addEventListener('orientationchange', scheduleViewportHeightUpdate);
+
+    return () => {
+      viewport.removeEventListener('resize', scheduleViewportHeightUpdate);
+      window.removeEventListener('orientationchange', scheduleViewportHeightUpdate);
+      if (frameId !== undefined) window.cancelAnimationFrame(frameId);
+      document.documentElement.style.removeProperty('--app-viewport-height');
+    };
+  }, []);
+
   const handleCancelProcessing = useCallback(() => {
     processingAbortRef.current?.abort();
     processingAbortRef.current = null;

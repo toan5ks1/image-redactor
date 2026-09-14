@@ -1,4 +1,7 @@
 :root {
+  /* Falls back to the layout viewport, then uses the visible viewport where supported.
+     App.tsx keeps this value in sync on iOS while Safari's browser chrome animates. */
+  --app-viewport-height: 100vh;
   color-scheme: dark;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-heading: "Inter", system-ui, -apple-system, sans-serif;
@@ -39,6 +42,12 @@
   --shadow-neon: 0 0 20px rgba(56, 189, 248, 0.25);
 }
 
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -50,7 +59,7 @@
 html,
 body,
 #root {
-  height: 100%;
+  height: var(--app-viewport-height);
   width: 100%;
   overflow: hidden;
   background-color: var(--bg-main);
@@ -174,7 +183,7 @@ summary:focus-visible,
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: var(--app-viewport-height);
   width: 100vw;
   background: var(--bg-main);
 }
@@ -884,7 +893,7 @@ summary:focus-visible,
   isolation: isolate;
   display: inline-flex;
   max-width: min(1120px, 100%);
-  max-height: calc(100dvh - 190px);
+  max-height: calc(var(--app-viewport-height) - 190px);
   overflow: hidden;
   border: 1px solid rgba(56, 189, 248, 0.28);
   border-radius: 12px;
@@ -899,7 +908,7 @@ summary:focus-visible,
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: calc(100dvh - 190px);
+  max-height: calc(var(--app-viewport-height) - 190px);
   object-fit: contain;
 }
 
@@ -995,7 +1004,10 @@ summary:focus-visible,
 /* Modal overlay */
 .modal-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--app-viewport-height);
   background: rgba(4, 7, 15, 0.85);
   backdrop-filter: blur(8px);
   display: flex;
@@ -1029,7 +1041,7 @@ summary:focus-visible,
   width: 100%;
   max-width: 520px;
   box-shadow: var(--shadow-xl);
-  max-height: calc(100dvh - 40px);
+  max-height: calc(var(--app-viewport-height) - 40px);
   overflow-y: auto;
   animation: modalIn 0.2s ease-out;
 }
@@ -1041,7 +1053,7 @@ summary:focus-visible,
 
 .debug-modal {
   max-width: 900px;
-  height: min(780px, calc(100dvh - 40px));
+  height: min(780px, calc(var(--app-viewport-height) - 40px));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2445,7 +2457,10 @@ summary:focus-visible,
 /* Compact export panel */
 .export-panel-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--app-viewport-height);
   z-index: 70;
   padding: 20px max(20px, env(safe-area-inset-right))
     max(20px, env(safe-area-inset-bottom));
@@ -2459,7 +2474,7 @@ summary:focus-visible,
 
 .export-panel {
   width: min(480px, 100%);
-  max-height: calc(100dvh - 40px);
+  max-height: calc(var(--app-viewport-height) - 40px);
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
@@ -2849,7 +2864,7 @@ summary:focus-visible,
 
 .processing-scan-stage,
 .processing-scan-image {
-  max-height: calc(100dvh - 152px);
+  max-height: calc(var(--app-viewport-height) - 152px);
 }
 
 @media (max-width: 640px) {
@@ -2894,7 +2909,7 @@ summary:focus-visible,
 
   .processing-scan-stage,
   .processing-scan-image {
-    max-height: calc(100dvh - 124px);
+    max-height: calc(var(--app-viewport-height) - 124px);
   }
 }
 
